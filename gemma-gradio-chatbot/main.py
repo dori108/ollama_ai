@@ -69,18 +69,23 @@ Do NOT wrap the JSON in code blocks or markdown like ```json. Just return plain 
     print("raw response:", response)
 
     try:
-        cleaned = str(response)
-        match = re.search(r"content='(.*?)'", cleaned, re.DOTALL)
-        if match:
-            cleaned = match.group(1).strip()
-        if cleaned.startswith("```"):
-            cleaned = re.sub(r"^```(?:json)?\n?", "", cleaned)
-            cleaned = re.sub(r"```$", "", cleaned)
-            cleaned = cleaned.strip()
+    cleaned = str(response)
+
+    # 'content=...' 안에서 JSON만 추출
+    match = re.search(r"content='(.*?)'", cleaned, re.DOTALL)
+    if match:
+        cleaned = match.group(1).strip()
+
+    # markdown 제거
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\n?", "", cleaned)
+        cleaned = re.sub(r"```$", "", cleaned)
+        cleaned = cleaned.strip()
 
     # JSON 파싱
     result_json = json.loads(cleaned)
     return result_json
+
 except Exception as e:
     return {
         "error": "Model did not return valid JSON",
