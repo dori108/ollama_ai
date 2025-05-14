@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from langchain_ollama import ChatOllama
 import json
+import re
 
 app = FastAPI()
 model = ChatOllama(model="gemma:7b-instruct", temperature=0)
@@ -21,7 +22,7 @@ async def generate_meal(request: Request):
         "sodium": 2300 - consumed.get("sodium", 0),
     }
 
-    prompt = """
+    prompt = f"""
 You are a professional nutritionist.
 
 User Information:
@@ -40,28 +41,34 @@ Remaining daily intake allowance:
 
 Please provide a meal plan in the following **strict JSON format only**:
 
-{
+{{
   "dish": "Dish name",
-  "meal_type": _selectedMealType,
+  "meal_type": "{meal_type}",
   "menu": ["item 1", "item 2", "item 3"],
   "notes": ["health advice or dietary context"],
   "calories": 0,
   "protein": 0.0,
   "carbs": 0.0,
   "fat": 0.0,
-  "sodium":0.0
-}
+  "sodium": 0.0
+}}
 
-Do not add any text outside the JSON. Only return a complete and valid JSON object.
+Do NOT wrap the JSON in code blocks or markdown like ```json. Just return plain JSON.
 """
 
     print("calling...")
     response = model.invoke(prompt)
+    print("raw response:", response)
+
+    # 클린업: ```json ... ``` 제거
+    cleaned = str(response).strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"```(?:json)?\n?", "", cleaned)
+        cleaned = re.sub(r"```", "", cleaned)
+        cleaned = cleaned.strip()
+
     try:
-        result_json = json.loads(str(response))
+        result_json = json.loads(cleaned)
         return result_json
     except Exception:
-        return {"error": "Model did not return valid JSON", "raw": str(response)}
-    print("result:")
-    print(response)
-    print("loading...")
+        return {"error": "Model did not return valid JSON", "raw": cleaned}
