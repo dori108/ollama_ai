@@ -23,7 +23,12 @@ async def generate_meal(request: Request):
     }
 
     prompt = f"""
-You are a professional nutritionist.
+You are a clinical dietitian for rare disease patients.
+
+Your main goal is to recommend a meal based on the patient's disease-related dietary needs. Ingredients are helpful but secondary.
+
+Analyze the diseases to identify dietary restrictions. Then design a complete and diverse meal adapted to the selected meal type: {meal_type.upper()}.
+---
 
 User Information:
 - Age: {user['age']}
@@ -60,15 +65,22 @@ Do NOT wrap the JSON in code blocks or markdown like ```json. Just return plain 
     response = model.invoke(prompt)
     print("raw response:", response)
 
-    # 클린업: ```json ... ``` 제거
-    cleaned = str(response).strip()
+    try:
+    cleaned = str(response)
+    match = re.search(r"content='(.*?)'", cleaned, re.DOTALL)
+    if match:
+        cleaned = match.group(1).strip()
     if cleaned.startswith("```"):
-        cleaned = re.sub(r"```(?:json)?\n?", "", cleaned)
-        cleaned = re.sub(r"```", "", cleaned)
+        cleaned = re.sub(r"^```(?:json)?\n?", "", cleaned)
+        cleaned = re.sub(r"```$", "", cleaned)
         cleaned = cleaned.strip()
 
-    try:
-        result_json = json.loads(cleaned)
-        return result_json
-    except Exception:
-        return {"error": "Model did not return valid JSON", "raw": cleaned}
+    # JSON 파싱
+    result_json = json.loads(cleaned)
+    return result_json
+except Exception as e:
+    return {
+        "error": "Model did not return valid JSON",
+        "exception": str(e),
+        "raw": str(response)
+    }
