@@ -82,19 +82,16 @@ You are a clinical dietitian for rare disease patients.
 Your main goal is to recommend a meal based on the patient's disease-related dietary needs. Ingredients are helpful but secondary.
 Analyze the diseases to identify dietary restrictions. Then design a complete and diverse meal adapted to the selected meal type: {meal_type.upper()}.
 
-- Disease dietary constraints:
-  - Protein limit: {protein_limit if protein_limit else 'N/A'}g
-  - Sugar limit: {sugar_limit if sugar_limit else 'N/A'}g
-  - Sodium limit: {sodium_limit if sodium_limit else 'N/A'}mg
   - Detailed clinical dietary guidance for rare diseases:
-{chr(10).join(
-    f"""For {d['diseaseName']}:
+{chr(10).join([
+    f"""    • For {d['diseaseName']}:
         - Clinical note: {d['notes']}
         - Foods to avoid: (based on disease pathology; if applicable)
         - Recommended substitutions: (e.g., medical formulas, low-protein products, non-dairy alternatives)
         - Meal planning tip: Prioritize nutritional balance while respecting disease constraints.
-""" 
-    for d in matched_constraints)}
+    """ for d in matched_constraints
+])}
+
 
 ---
 
