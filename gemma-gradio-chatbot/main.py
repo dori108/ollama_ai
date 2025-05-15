@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from ollama import Client
 import json
 import re
+import os
 
 app = FastAPI()
 client = Client()
@@ -31,20 +32,47 @@ def calculate_base_nutrients(user):
     }
 
 
+# JSON 데이터 로드
+def load_disease_constraints():
+    file_path = os.path.join("data", "disease_limits.json")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
 @app.post("/generate-meal")
 async def generate_meal(request: Request):
     body = await request.json()
 
     user = body["user_info"]
+    disease_constraints = load_disease_constraints()
+    
+    # user["disease"] 예: ["Phenylketonuria (PKU)", "Galactosemia"]
+    matched_constraints = [d for d in disease_constraints if d["diseaseName"] in user.get("disease", [])]
+    
+    # 제한 기준 중 가장 보수적인 값 선택 (최솟값 기준)
+    protein_limit = min((d["proteinLimit"] for d in matched_constraints), default=None)
+    sugar_limit = min((d["sugarLimit"] for d in matched_constraints), default=None)
+    sodium_limit = min((d["sodiumLimit"] for d in matched_constraints), default=None)
+    disease_notes = [d["notes"] for d in matched_constraints]
+    
     meal_type = body["meal_type"]
     consumed = body["consumed_so_far"]
 
     base_targets = calculate_base_nutrients(user)
+    # 남은 권장량을 기존 기준에서 질병 제한 기준까지 낮춤
+
+    adjusted_targets = {
+        "protein": min(base_targets["protein"], protein_limit) if protein_limit else base_targets["protein"],
+        "fat": base_targets["fat"],
+        "carbohydrates": min(base_targets["carbohydrates"], sugar_limit) if sugar_limit else base_targets["carbohydrates"],
+        "sodium": min(base_targets["sodium"], sodium_limit) if sodium_limit else base_targets["sodium"],
+    }
+    
     remaining = {
-        "protein": max(0, base_targets["protein"] - consumed.get("protein", 0)),
-        "fat": max(0, base_targets["fat"] - consumed.get("fat", 0)),
-        "carbohydrates": max(0, base_targets["carbohydrates"] - consumed.get("carbs", 0)),
-        "sodium": max(0, base_targets["sodium"] - consumed.get("sodium", 0)),
+        "protein": max(0, adjusted_targets["protein"] - consumed.get("protein", 0)),
+        "fat": max(0, adjusted_targets["fat"] - consumed.get("fat", 0)),
+        "carbohydrates": max(0, adjusted_targets["carbohydrates"] - consumed.get("carbs", 0)),
+        "sodium": max(0, adjusted_targets["sodium"] - consumed.get("sodium", 0)),
     }
 
 
@@ -53,6 +81,13 @@ You are a clinical dietitian for rare disease patients.
 
 Your main goal is to recommend a meal based on the patient's disease-related dietary needs. Ingredients are helpful but secondary.
 Analyze the diseases to identify dietary restrictions. Then design a complete and diverse meal adapted to the selected meal type: {meal_type.upper()}.
+- Disease dietary constraints:
+  - Protein limit: {protein_limit if protein_limit else 'N/A'}g
+  - Sugar limit: {sugar_limit if sugar_limit else 'N/A'}g
+  - Sodium limit: {sodium_limit if sodium_limit else 'N/A'}mg
+  - Notes:
+    - {chr(10).join(disease_notes) if disease_notes else 'None'}
+
 
 ---
 
