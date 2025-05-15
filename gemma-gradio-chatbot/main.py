@@ -88,7 +88,7 @@ Analyze the diseases to identify dietary restrictions. Then design a complete an
   - Sodium limit: {sodium_limit if sodium_limit else 'N/A'}mg
   - Detailed clinical dietary guidance for rare diseases:
 {chr(10).join(
-    f"""    • For {d['diseaseName']}:
+    f"""For {d['diseaseName']}:
         - Clinical note: {d['notes']}
         - Foods to avoid: (based on disease pathology; if applicable)
         - Recommended substitutions: (e.g., medical formulas, low-protein products, non-dairy alternatives)
