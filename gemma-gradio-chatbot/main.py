@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Request
-from langchain_ollama import ChatOllama
+from ollama import Client
 import json
 import re
 
 app = FastAPI()
-model = ChatOllama(model="gemma:7b-instruct", temperature=0)
+client = Client(model="gemma:7b-instruct", temperature=0)
 
 
 @app.post("/generate-meal")
@@ -28,9 +28,6 @@ You are a clinical dietitian for rare disease patients.
 Your main goal is to recommend a meal based on the patient's disease-related dietary needs. Ingredients are helpful but secondary.
 
 Analyze the diseases to identify dietary restrictions. Then design a complete and diverse meal adapted to the selected meal type: {meal_type.upper()}.
-
-In the "notes" field, you must include disease-specific nutritional considerations — what this meal avoids or includes for the user's condition.
-
 ---
 
 User Information:
@@ -52,7 +49,7 @@ Please provide a meal plan in the following **strict JSON format only**:
 {{
   "dish": "Dish name",
   "meal_type": "{meal_type}",
-  "menu": ["item 1", "item 2", "item 3"],
+  "menu": "item 1, item 2, item 3",
   "notes": ["health advice or dietary context"],
   "calories": 0,
   "protein": 0.0,
@@ -65,24 +62,22 @@ Do NOT wrap the JSON in code blocks or markdown like ```json. Just return plain 
 """
 
     print("calling...")
-    response = model.invoke(prompt)
-    print("raw response:", response)
+    response = client.chat(
+        model="gemma:7b-instruct",
+        messages=[{"role": "user", "content": prompt}],
+        options={"temperature": 0},
+    )
+    raw = response["message"]["content"]
+    print("raw response:", raw)
 
     try:
-        cleaned = str(response)
-    
-        # 'content=...' 안에서 JSON만 추출
-        match = re.search(r"content='(.*?)'", cleaned, re.DOTALL)
-        if match:
-            cleaned = match.group(1).strip()
-    
-        # markdown 제거
+        cleaned = raw.strip()
+
         if cleaned.startswith("```"):
             cleaned = re.sub(r"^```(?:json)?\n?", "", cleaned)
             cleaned = re.sub(r"```$", "", cleaned)
             cleaned = cleaned.strip()
 
-        # JSON 파싱
         result_json = json.loads(cleaned)
         return result_json
 
@@ -90,5 +85,5 @@ Do NOT wrap the JSON in code blocks or markdown like ```json. Just return plain 
         return {
             "error": "Model did not return valid JSON",
             "exception": str(e),
-            "raw": str(response)
+            "raw": raw
         }
