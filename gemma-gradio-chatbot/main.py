@@ -120,6 +120,9 @@ Please provide a meal plan in the following **strict JSON format only**:
 }}
 
 Do NOT wrap the JSON in code blocks or markdown like ```json. Just return plain JSON.
+Do NOT include units like 'g', 'mg', or '%' — only use numbers for nutrition values.
+Return only the JSON object. No explanation, no headers.
+
 """
 
     print("calling...")
